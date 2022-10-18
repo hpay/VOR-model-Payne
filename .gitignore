@@ -1,0 +1,8 @@
+*.asv
+*.egg-info
+*.mat
+*.pdf
+results
+data
+.ipynb_checkpoints
+__pycache__
