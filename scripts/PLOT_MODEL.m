@@ -22,7 +22,8 @@ set(groot,'defaultAxesZTickLabelRotationMode','manual')
 [folder_root, filename] = fileparts(filepathname);
 
 % Add helper function folders to search path
-addpath(genpath(fullfile(fileparts(which(mfilename)),'helperFunctions')))
+code_folder = fileparts(fileparts(which(mfilename)));
+addpath(genpath(fullfile(code_folder, 'src')))
 
 % Load the full model
 D = load(fullfile(folder_root,filename,[filename,'.mat']));
@@ -32,7 +33,6 @@ E = D.E; % Model fit errors
 S = D.S; % Scale factors for normalizing data going into model fit
 R = D.R; % Regularization
 
-dropbox_root = I.figures_path(1:strfind(I.figures_path, 'Dropbox')+6);
 
 % Change colors
 I.c = flipud(turbo(12));
@@ -41,12 +41,14 @@ I.c(end,:) = [];
 % May need to fix path in parameters file (e.g. if current pathname doesn't match original pathname)
 I.figures_path = fullfile(folder_root, filename);
 if option_final
+    dropbox_root = I.figures_path(1:strfind(I.figures_path, 'Dropbox')+6);
     I.figures_path = fullfile(dropbox_root,'rlab','model','Figures');
 end
 
 % I.data_path = fullfile(folder_root, 'VOR-model','data');
 % [data_path_temp1, data_path_temp2] = fileparts(I.data_path);
-I.data_path = fullfile(fileparts(which(mfilename)), 'data');
+% I.data_path = fullfile(fileparts(which(mfilename)), 'data');
+I.data_path = fullfile(code_folder, 'data');
 
 [conds, nConds_JR, tts, head, target, hevel, PC, sines, light, ...
     dt, n_cells, RR_data] = loadJR_RR_combined(I, I.data_path);

@@ -301,7 +301,13 @@ for ii_temp = 1:length(I.runPFs)
     close all;
     fprintf('Starting PF = %g\n', I.PFs(ii));
         
-    
+            
+    % Avoid re-running
+    curr_savename = sprintf('%s_%gPF.mat', I.savename, I.PFs(ii));    
+    curr_savepathname = fullfile(I.figures_path, curr_savename);
+    if exist(curr_savepathname,'file')
+        continue;
+    end
     %% 1. LINEAR REGRESSION TO INITIALIZE WEIGHTS
     
     % ************ Eye fit: first to get scaling for kPE (kEP*kPE = PF)**********
@@ -602,9 +608,7 @@ for ii_temp = 1:length(I.runPFs)
     K0 = K0_vis;
     K2 = K2_vis;
     
-    curr_savename = sprintf('%s_%gPF.mat', I.savename, I.PFs(ii));
-
-    save(fullfile(I.figures_path, curr_savename), 'I', 'S', 'B', 'R', 'RR_data',...
+    save(curr_savepathname, 'I', 'S', 'B', 'R', 'RR_data',...
         'K1','K2','K0','conds',  'E')
     
     fprintf('Complete PF = \n');
