@@ -1,11 +1,9 @@
 *.asv
 *.egg-info
-*.mat
 *.fig
 *.png
 *.tif
 *.pdf
 results
-data
 .ipynb_checkpoints
 __pycache__

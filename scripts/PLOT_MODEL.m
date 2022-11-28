@@ -25,6 +25,7 @@ set(groot,'defaultAxesZTickLabelRotationMode','manual')
 code_folder = fileparts(fileparts(which(mfilename)));
 addpath(genpath(fullfile(code_folder, 'src')))
 folder_root = fullfile(code_folder,'results');
+data_path = fullfile(code_folder, 'data');
 
 % Load the full model
 D = load(fullfile(folder_root,filename,[filename,'.mat']));
@@ -46,13 +47,8 @@ if option_final
 end
 I.impulse_or_closedloop = 0; 
 
-% data_path = fullfile(folder_root, 'VOR-model','data');
-% [data_path_temp1, data_path_temp2] = fileparts(data_path);
-% data_path = fullfile(fileparts(which(mfilename)), 'data');
-data_path = fullfile(code_folder, 'data');
-
 [conds, nConds_JR, tts, head, target, hevel, PC, sines, light, ...
-    dt, n_cells, RR_data] = loadJR_RR_combined(I, data_path);
+    dt, RR_data] = loadJR_RR_combined(I, data_path);
 [conds, tts, head, target, hevel, PC, sines, light] = addStep(I, conds, ...
     tts, head, target, hevel, PC, sines, light);
 

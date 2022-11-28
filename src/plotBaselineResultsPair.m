@@ -2,11 +2,6 @@ function hf_basefit = plotBaselineResultsPair(K, I, conds, tts, head, target, he
 % Plot JR data & model before learning & get error
 % Use with a pair of inputs K e.g. K1([1 11])
 
-% t_step = 0.7;
-% flag_average = 0;
-% [tts, head, target,  hevel, ~, PC, sines, lights, dt, n_cells] =...
-%     loadJR(I.data_path, [], t_step, flag_average);
-
 I.impulse_or_closedloop = 0; % Check with closed loop
 
 % Plot data
@@ -19,9 +14,7 @@ for ii = 1:5
     scalex = 1.2;    
     scaley = 1.1;
     pos = get(subplots(ii),'Pos');
-    set(subplots(ii),'Pos',[pos(1)+pos(3)*xpos_offset(ii)-pos(3)*(scalex-1)/2 , pos(2)-pos(4)*(scaley-1)/2, pos(3)*scalex, pos(4)*scaley])
-    
-    
+    set(subplots(ii),'Pos',[pos(1)+pos(3)*xpos_offset(ii)-pos(3)*(scalex-1)/2 , pos(2)-pos(4)*(scaley-1)/2, pos(3)*scalex, pos(4)*scaley])        
 end
 
 for gg = 1:2

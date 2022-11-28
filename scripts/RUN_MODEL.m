@@ -152,7 +152,7 @@ copyfile(fullfile(code_folder,'scripts'), fullfile(I.figures_path,'scripts'))
 
 %% =================== LOAD INPUTS ===================
 [conds, I.nConds_JR, tts, head, target, hevel, PC, sines, light,...
-    I.dt, n_cells, RR_data] = loadJR_RR_combined(I, data_path);
+    I.dt, RR_data] = loadJR_RR_combined(I, data_path);
 
 % Measure "steady state" eye and PC  from JR data
 vord_step_ind = strcmp(conds,'500ms_dark');
@@ -267,7 +267,7 @@ for ii_temp = 1:length(I.runPFs)
     rng(0)
 
     ii = find(abs(I.PFs-I.runPFs(ii_temp))<eps);
-%     close all;
+    close all;
     fprintf('Starting PF = %g\n', I.PFs(ii));        
             
     % Avoid re-running

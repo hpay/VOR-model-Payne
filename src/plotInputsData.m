@@ -15,6 +15,11 @@ if ~exist('subplots','var')
     end
 end
 
+
+if size(ipsiPC{1},2)==1
+    plotMeans = true;
+end
+
 %% Plot - describe step window here
 xlims_actual = [-.05 0.6];
 
