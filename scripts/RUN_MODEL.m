@@ -153,6 +153,7 @@ copyfile(fullfile(code_folder,'scripts'), fullfile(I.figures_path,'scripts'))
 %% =================== LOAD INPUTS ===================
 [conds, I.nConds_JR, tts, head, target, hevel, PC, sines, light,...
     I.dt, RR_data] = loadJR_RR_combined(I, data_path);
+I.freqs_JR = unique(sines(1:I.nConds_JR)); I.freqs_JR(I.freqs_JR==0) = [];
 
 % Measure "steady state" eye and PC  from JR data
 vord_step_ind = strcmp(conds,'500ms_dark');
@@ -165,25 +166,10 @@ I.eye_gain_ss = (nanmean(hevel{vord_step_ind}(ss_mask))/nanmean(head{vord_step_i
     tts, head, target, hevel, PC, sines, light);
 I.nConds = length(conds);
 
-% Create basis sets
-debug_on = 1;
-log_scale = 0.1;
-norm_on = 1;
-
-B = [];
-B.dt = I.dt;
-B.B_PH = makeSmoothTemporalBasisCosLog(I.max_time_basis, I.n_basis,I.dt, I.coverage_basis, I.delayH, log_scale, norm_on, debug_on);       % Basis set for PC from head
-B.B_EH = makeSmoothTemporalBasisCosLog(I.max_time_basis, I.n_basis,I.dt, I.coverage_basis, I.delayH, log_scale, norm_on, debug_on);       % Basis set for eye from head
-B.B_vis = makeSmoothTemporalBasisCosLog(I.max_time_basis_vis, I.n_basis_vis,I.dt, I.coverage_basis, I.delayR, log_scale, norm_on, debug_on);  % Basis set for retinal slip
-B.B_EP = makeSmoothTemporalBasisCosLog(I.max_time_basis_EP, I.n_basis,I.dt, I.coverage_basis, I.delayEP, log_scale, norm_on, debug_on);   % Basis set for PC to Eye synapse
-I.freqs_JR = unique(sines(1:I.nConds_JR)); I.freqs_JR(I.freqs_JR==0) = [];
-B.B_tar = ones(1,length(I.freqs_JR)); % Enumerate - one for each frequency JR tested
-B.B_tar_step = 1;
-
 % Create stimulus history matrices in basis space
 [S, B, PH_basis, EH_basis, R_basis, T_vel_basis, T_acc_basis,...
     T_vel_step_basis, T_acc_step_basis, PE_basis, EP_basis] = ...
-    buildLinearFitMatrices(I, B, head, target, hevel, PC, sines, light);
+    buildLinearFitMatrices(I, head, target, hevel, PC, sines, light);
 
 disp('Bases multiplied')
 
@@ -216,7 +202,7 @@ S_pc(isnan(S_pc)) = 0;
     = deal(false(1,size(S_pc,2)));
 order_pc = cumsum([1 I.n_basis,  I.n_basis_vis,...
     I.include_T_sine*size(B.B_tar,2), I.include_T_sine*size(B.B_tar,2),...
-    I.include_T_step*size(B.B_tar_step,2), I.include_T_step*size(B.B_tar_step,2)]);
+    I.include_T_step*[1 1] ]);
 B.bPH_maskP(order_pc(1):order_pc(2)-1) = true;
 B.bPR_vel_maskP(order_pc(2):order_pc(3)-1) = true;
 B.bPT_vel_maskP(order_pc(3):order_pc(4)-1) = true;
@@ -372,7 +358,6 @@ for ii_temp = 1:length(I.runPFs)
         
         % Plot linear fit predictions of eye and PC
         [err_eye, err_pc, Ehat_linear, Phat_linear] = plotLinearPredictions(S_eye_lo, S_pc_lo,R_eye_lo, R_pc_lo,  Kb_eye, Kb_pc);
-        fprintf('Baseline linear fit RMSE, eye: %.3g deg/s,  PC: %.3g sp/s\n', err_eye, err_pc)
                    
         % Plot resulting filter
         [hf_filter, ~] = plotFilters(K1_orig);
@@ -395,7 +380,7 @@ for ii_temp = 1:length(I.runPFs)
         K0_orig = tuneVestibularLinear(K1_orig, B, I, S, B.learn_mask_vest_eye_pc, 0, conds,tts, ...
             R, RR_data, S_pc, S_eye, R_pc, R_eye);
         
-        %  Plot after learning
+        %  Plot after initialization
         [hF_freq_eye, hF_filters, hF_step, hF_sine] = ...
             plotPostLearning(I, K1_orig, K2_orig, K0_orig, RR_data);
         

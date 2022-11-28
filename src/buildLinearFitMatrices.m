@@ -1,6 +1,6 @@
 function [S, B, PH_basis, EH_basis, R_basis, T_vel_basis, T_acc_basis,...
 T_vel_step_basis, T_acc_step_basis, PE_basis, EP_basis] = ...
-buildLinearFitMatrices(I, B, head, target, hevel, PC, sines, light)
+buildLinearFitMatrices(I, head, target, hevel, PC, sines, light)
 % [S, PH_basis, EH_basis, R_basis, T_vel_basis, T_acc_basis,...
 % T_vel_step_basis, T_acc_step_basis, PE_basis, EP_basis] = ...
 % buildLinearFitMatrices(I, head, target, hevel, PC, sines, light)
@@ -8,7 +8,37 @@ buildLinearFitMatrices(I, B, head, target, hevel, PC, sines, light)
 % Takes the time domain data as input and returns matrices for each
 % conditions containing the data multiplied by the basis sets
 
+% Create basis sets
+debug_on = 1;
+log_scale = 0.1;
+norm_on = 1;
+B = [];
+B.dt = I.dt;
+B.B_PH = makeSmoothTemporalBasisCosLog(I.max_time_basis, I.n_basis,I.dt, I.coverage_basis, I.delayH, log_scale, norm_on, debug_on);       % Basis set for PC from head
+B.B_EH = makeSmoothTemporalBasisCosLog(I.max_time_basis, I.n_basis,I.dt, I.coverage_basis, I.delayH, log_scale, norm_on, debug_on);       % Basis set for eye from head
+B.B_vis = makeSmoothTemporalBasisCosLog(I.max_time_basis_vis, I.n_basis_vis,I.dt, I.coverage_basis, I.delayR, log_scale, norm_on, debug_on);  % Basis set for retinal slip
+B.B_EP = makeSmoothTemporalBasisCosLog(I.max_time_basis_EP, I.n_basis,I.dt, I.coverage_basis, I.delayEP, log_scale, norm_on, debug_on);   % Basis set for PC to Eye synapse
+B.B_tar = ones(1,length(I.freqs_JR)); % Enumerate - one for each frequency JR tested
+B.B_tar_step = 1;
 
+% Create efference copy input
+[PE_basis, B.B_PE] = filterExponential(I.tauPE, I.dt, hevel, sines);
+
+
+% Take target velocity then replace with zeros if dark or sine wave
+target_vel_step_zeros = target;
+target_vel_step_zeros(~light | sines>0) = cellfun(@(x) zeros(size(x)), target(~light | sines>0),'Uni',0);
+
+% Filter with given tau for predictive target during step
+[T_vel_step_basis, B.B_PT_vel_step] = filterExponential(I.T_step_tau_guess, I.dt, target_vel_step_zeros, sines, I.delay_tar_step);
+
+% Do the same thing with target acceleration
+target_acc_step_zeros = cellfun(@(x)[0; diff(x)]/I.dt,target_vel_step_zeros,'UniformOutput',false);
+[T_acc_step_basis, B.B_PT_acc_step] = filterExponential(I.T_step_tau_guess, I.dt, target_acc_step_zeros, sines, I.delay_tar_step);
+
+
+
+% Calculate retinal slip
 retslip_vel = cellfun(@(T, H, E) T-H-E, target, head, hevel,'Uni',0);
 
 % Create a predictive target signal that is only present in the light
@@ -53,19 +83,6 @@ for jj = 1:I.nConds
     
 end
 
-% Create efference copy input
-[PE_basis, B.B_PE] = filterExponential(I.tauPE, I.dt, hevel, sines);
-
-% Take target velocity then replace with zeros if dark or sine wave
-target_vel_step_zeros = target;
-target_vel_step_zeros(~light | sines>0) = cellfun(@(x) zeros(size(x)), target(~light | sines>0),'Uni',0);
-
-% Filter with given tau for predictive target during step
-[T_vel_step_basis, B.B_PT_vel_step] = filterExponential(I.T_step_tau_guess, I.dt, target_vel_step_zeros, sines, I.delay_tar_step);
-
-% Do the same thing with target acceleration
-target_acc_step_zeros = cellfun(@(x)[0; diff(x)]/I.dt,target_vel_step_zeros,'UniformOutput',false);
-[T_acc_step_basis, B.B_PT_acc_step] = filterExponential(I.T_step_tau_guess, I.dt, target_acc_step_zeros, sines, I.delay_tar_step);
 
 % Normalize so different inputs have roughly equal amplitude (all are
 % already centered around 0). TODO: could eliminate and combine with
