@@ -9,8 +9,6 @@ if ~exist('debug_on','var')
     debug_on= 0;
 end
 
-freqs_JR = [.5 2 5 10];
-
 nt = length(head_vel);
  
 % Create target acc and pos in case needed for predictive target signal
@@ -47,9 +45,7 @@ else
 
     if sine
             
-        % HEAD INPUT - IN THE LIGHT - different from dark!
-%         E_head = filter(F.EH_light_sine, 1, head_vel);
-%         P_head = filter(F.PH_light_sine, 1, head_vel);       
+        % HEAD INPUT - IN THE LIGHT - different from dark!     
         E_head = filter(F.EH_light, 1, head_vel);
         P_head = filter(F.PH_light, 1, head_vel);        
         
@@ -58,7 +54,7 @@ else
         P_vis = filter(F.PT_sine, 1, target_vel);
         
         % If the target option = 'enum'
-        mask = freqs_JR==sine;
+        mask = I.freqs_JR==sine;
         if length(F.PT_vel)==length(mask)
             
             % Separate step for retinal slip visual input and predictive
@@ -85,10 +81,7 @@ else
     else % step
         
                     
-        % HEAD INPUT - IN THE LIGHT - different from dark!
-%         E_head = filter(F.EH_light_step, 1, head_vel);
-%         P_head = filter(F.PH_light_step, 1, head_vel);   
-        
+        % HEAD INPUT - IN THE LIGHT - different from dark!        
         E_head = filter(F.EH_light, 1, head_vel);
         P_head = filter(F.PH_light, 1, head_vel);        
         

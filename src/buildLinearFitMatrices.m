@@ -49,8 +49,7 @@ for jj = 1:I.nConds
     else        
         T_vel_basis{jj} = zeros(length(target_vel{jj}), size(B.B_tar,2));
         T_acc_basis{jj} = zeros(length(target_vel{jj}), size(B.B_tar,2));
-    end
-    
+    end    
     
 end
 
@@ -64,24 +63,17 @@ target_vel_step_zeros(~light | sines>0) = cellfun(@(x) zeros(size(x)), target(~l
 % Filter with given tau for predictive target during step
 [T_vel_step_basis, B.B_PT_vel_step] = filterExponential(I.T_step_tau_guess, I.dt, target_vel_step_zeros, sines, I.delay_tar_step);
 
-% ?TODO: make target prediction go back to 0 at x ms delay after target stops?
-
 % Do the same thing with target acceleration
 target_acc_step_zeros = cellfun(@(x)[0; diff(x)]/I.dt,target_vel_step_zeros,'UniformOutput',false);
 [T_acc_step_basis, B.B_PT_acc_step] = filterExponential(I.T_step_tau_guess, I.dt, target_acc_step_zeros, sines, I.delay_tar_step);
 
-if I.fit_T_step_tau
-    T_vel_step_basis = cellfun(@(x) [x zeros(size(x))], T_vel_step_basis,'Uni',0); % Temp: placeholder for time constant parameter
-    T_acc_step_basis = cellfun(@(x) [x zeros(size(x))], T_acc_step_basis,'Uni',0); % Temp: placeholder for time constant parameter (second column)
-end
-
-
 % Normalize so different inputs have roughly equal amplitude (all are
-% already centered around 0)
+% already centered around 0). TODO: could eliminate and combine with
+% regularization
 S = [];
-S.scale_P = 1/nanstd(cell2mat(PC(1:I.nConds_JR)));
-S.scale_H_vel = 1/nanstd(cell2mat(head(1:I.nConds_JR)));
-S.scale_R_vel = 1/nanstd(cell2mat(retslip_vel(1:I.nConds_JR)));
-S.scale_T_vel = 1/nanstd(cell2mat(target_vel(1:I.nConds_JR)));
-S.scale_T_acc = 1/nanstd(cell2mat(target_acc(1:I.nConds_JR)));
-S.scale_E = 1/nanstd(cell2mat(hevel(1:I.nConds_JR)));
+S.scale_P = 1/std(cell2mat(PC(1:I.nConds_JR)),'omitnan');
+S.scale_H_vel = 1/std(cell2mat(head(1:I.nConds_JR)));
+S.scale_R_vel = 1/std(cell2mat(retslip_vel(1:I.nConds_JR)),'omitnan');
+S.scale_T_vel = 1/std(cell2mat(target_vel(1:I.nConds_JR)),'omitnan');
+S.scale_T_acc = 1/std(cell2mat(target_acc(1:I.nConds_JR)),'omitnan');
+S.scale_E = 1/std(cell2mat(hevel(1:I.nConds_JR)),'omitnan');

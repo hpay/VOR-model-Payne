@@ -1,6 +1,9 @@
 *.asv
 *.egg-info
 *.mat
+*.fig
+*.png
+*.tif
 *.pdf
 results
 data

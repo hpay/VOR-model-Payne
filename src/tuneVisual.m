@@ -28,12 +28,6 @@ p_orig = K1.Kb_eye_pc(mask_learn);
 lb = -inf(length(K1.Kb_eye_pc),1);
 ub = inf(length(K1.Kb_eye_pc),1);
 
-% If enumerating predictive target, the tau for steps (last param) must be positive:
-if I.fit_T_step_tau~=0
-    lb(find(B.bPT_vel_step_mask, 1, 'last')) = 0;
-    lb(find(B.bPT_acc_step_mask, 1, 'last')) = 0;
-end
-
 % If all target inputs must be positive
 if I.restrict_PT_pos
     lb(B.bPT_vel_step_mask) = 0;

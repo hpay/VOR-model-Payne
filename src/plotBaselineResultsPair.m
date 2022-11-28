@@ -1,16 +1,13 @@
-function [hf_basefit, rmse_eye, rmse_pc, nrmse_eye, nrmse_pc] = ...
-    plotBaselineResultsPair(K, I, conds)
+function hf_basefit = plotBaselineResultsPair(K, I, conds, tts, head, target, hevel, PC, light, sines)
 % Plot JR data & model before learning & get error
 % Use with a pair of inputs K e.g. K1([1 11])
 
-t_step = 0.7;
-flag_average = 0;
-[tts, head, target,  hevel, ~, PC, sines, lights, dt, n_cells] =...
-    loadJR(I.data_path, [], t_step, flag_average);
-
+% t_step = 0.7;
+% flag_average = 0;
+% [tts, head, target,  hevel, ~, PC, sines, lights, dt, n_cells] =...
+%     loadJR(I.data_path, [], t_step, flag_average);
 
 I.impulse_or_closedloop = 0; % Check with closed loop
-
 
 % Plot data
 hf_basefit = figure;
@@ -30,11 +27,11 @@ end
 for gg = 1:2
     
     % Get model output
-    [Ehat, Phat] = getModelJR(K(gg), I, head, target, lights, sines);
+    [Ehat, Phat] = getModelJR(K(gg), I, head, target, light, sines);
     
     % Plot data
     [hf_basefit, hs, offsets, xlims] = plotInputsData(conds, tts,...
-        head, target, hevel, PC, sines, lights,1,0, subplots([1 (0:1)+gg*2]));
+        head, target, hevel, PC, sines, light,1,0, subplots([1 (0:1)+gg*2]));
     
     % Plot model
     plotInputsModel(hf_basefit, tts, Ehat, Phat, ...

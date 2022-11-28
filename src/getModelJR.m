@@ -3,9 +3,9 @@ function [Ehat, Phat] = getModelJR(K_or_F, I, head, target, light, sines)
 %
 % Get model predictions 
 
-% Make sure its ok to use impulse
+% Make sure its ok to use impulse response version of simulation
 if any(light)
-    I.impulse_or_closedloop = 0; % Might not be necessary but safer
+    I.impulse_or_closedloop = 0; % Use closed loop version 
 end
 
 % Get impulse response if needed

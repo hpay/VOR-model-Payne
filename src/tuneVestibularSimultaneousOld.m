@@ -1,27 +1,22 @@
 function [K0new, K1new, K2new] = tuneVestibularSimultaneousOld(...
     K0_0, K1_0, K2_0, B, I, S, ...
-    tts, head, target, E, P, conds, light, sines, R, RL_data)
+    tts, head, target, E, P, conds, light, sines, R, RR_data)
 
-% PARAMETERS
-debug_on = 0;
-% scale_regularization = 1; % scale the total regularization penalty
-dt = K1_0.dt;
+% Mask free params
 mask_learn = B.learn_mask_vest_eye_pc;
 mask_tune = B.tune_mask_vest_eye_pc;
 n_total = length(K1_0.Kb_eye_pc);
-n_final = nnz(mask_tune);
-% END PARAMETERS
 
 % Goal gain and phase of eye
-E_gain_goal1 = RL_data.gains1/RL_data.scaleJR2SL;
-E_phase_goal1 = RL_data.phases1;
-E_gain_goal2 = RL_data.gains2/RL_data.scaleJR2SL;
-E_phase_goal2 = RL_data.phases2;
-E_gain_goal0 = RL_data.gains0/RL_data.scaleJR2SL;
-E_phase_goal0 = RL_data.phases0;
+E_gain_goal1 = RR_data.gains1/RR_data.scaleJR2RR;
+E_phase_goal1 = RR_data.phases1;
+E_gain_goal2 = RR_data.gains2/RR_data.scaleJR2RR;
+E_phase_goal2 = RR_data.phases2;
+E_gain_goal0 = RR_data.gains0/RR_data.scaleJR2RR;
+E_phase_goal0 = RR_data.phases0;
 
 % Get the goal PC baseline gain and phase for 0.5 Hz (close to steady state)
-[pc_amp, pc_phase] = fitsine(dt, P{1}, .5);
+[pc_amp, pc_phase] = fitsine(K1_0.dt, P{1}, .5);
 
 vord_step_ind = strcmp(conds,'500ms_dark');
 pc_gain_ss = I.pc_gain_ss;
@@ -33,30 +28,29 @@ pc_trans_init = temp1(find(abs(temp1)==max(abs(temp1)),1))/max(head{vord_step_in
 eye_ss = [ E_gain_goal0(1) E_gain_goal1(1) E_gain_goal2(1)];
 
 % Combining SL and Watanabe
-pc_ss = pc_gain_ss + 1/RL_data.scaleJR2SL*...
+pc_ss = pc_gain_ss + 1/RR_data.scaleJR2RR*...
     I.pc_ss.*(1-I.eye_ss); % change in sp/s per change in deg/s, * change in gain
 
 
 % Create a PC goal gain and phase
-P_gain_goal1 = NaN(size(RL_data.freqs));
-P_phase_goal1 = NaN(size(RL_data.freqs));
+P_gain_goal1 = NaN(size(RR_data.freqs));
+P_phase_goal1 = NaN(size(RR_data.freqs));
 P_gain_goal1(1) = abs(pc_gain_ss);
 P_phase_goal1(1) = pc_phase;
 
-P_gain_goal0 = NaN(size(RL_data.freqs));
-P_phase_goal0 = NaN(size(RL_data.freqs));
+P_gain_goal0 = NaN(size(RR_data.freqs));
+P_phase_goal0 = NaN(size(RR_data.freqs));
 P_gain_goal0(1) = abs(pc_ss(1));
-P_phase_goal0(1) = 11; % deg, Watanabe 1985
+P_phase_goal0(1) = 11; % (deg) Watanabe 1985
 
-P_gain_goal2 = NaN(size(RL_data.freqs));
-P_phase_goal2 = NaN(size(RL_data.freqs));
+P_gain_goal2 = NaN(size(RR_data.freqs));
+P_phase_goal2 = NaN(size(RR_data.freqs));
 P_gain_goal2(1) = abs(pc_ss(3));
-P_phase_goal2(1) = 172; % deg, Watanabe 1985
+P_phase_goal2(1) = 172; % (deg) Watanabe 1985
 
 
-% Using Lisberger data for the transients (don't weight too much, likely to
-% ohigh because it measures the peak rate in 1st 50 ms)
-pc_trans =  pc_trans_init + 1/RL_data.scaleJR2SL*[1.62  0 -1.01];% TODO: check the scaling
+% Using Lisberger data for the transients
+pc_trans =  pc_trans_init + 1/RR_data.scaleJR2RR*[1.62  0 -1.01];% ***TODO: check the scaling
 
 % Original free parameters (3 x n)
 p_init = [K0_0.Kb_eye_pc(mask_tune)...
@@ -73,8 +67,6 @@ mask_fixEP = ~ismember(temp_tune, temp_learn);
 lb = -inf(n_total, 3);
 ub = inf(n_total, 3);
 
-
-
 % Add a constraint so that baseline kEP is positive
 if I.restrict_EP_pos
     lb(B.bEP_mask,:) = 0;
@@ -84,18 +76,7 @@ end
 lb = lb(mask_tune,:);
 ub = ub(mask_tune,:);
 
-% Plot progress
-% figure; hs = subplot(1,1,1);
-% set(hs, 'ColorOrder', parula(10), 'NextPlot', 'replacechildren');
-
-legend_str = [];
-
-% Initialize these so they are global variables for plotting
-err_plot = [];
-err_out_curr = [];
-
 % Set up A and B constraints to constrain the direction of plasticity at kPH
-
 % Constrain the NET direction of plasticity if specified: A_ineq*X<b_ineq
 A_ineq = [ ...
     -I.fixPH*(B.bPH_mask)   I.fixPH*(B.bPH_mask)    zeros(1,n_total);...
@@ -107,11 +88,9 @@ A_ineq = A_ineq(:,...
 
 % Mask out the rows that are not constrainted (all zero)
 A_ineq = A_ineq(any(A_ineq,2),:);
-
 B_ineq = zeros(size(A_ineq,1),1);   % B is all zeros
 
-
-% METHOD 2: fmincon
+% Set options for fmincon
 options = optimoptions('fmincon','MaxIter',1000,'FunctionTolerance',10,...
     'StepTolerance',1e-7,'MaxFunctionEvaluations', 1e8,...
     'Display','iter','UseParallel',true,'PlotFcn','optimplotfval');
@@ -182,19 +161,16 @@ K2new = updateKp(K1_0, I, p2, mask_tune);
         
         % Total error
         err_out_curr = [err_out0  err_out1  err_out2  err_EP];
-        legend_str = {'E0','P0','reg0','E1','P1','reg1','E2','P2','reg2','scaleEP'};
+%         legend_str = {'E0','P0','reg0','E1','P1','reg1','E2','P2','reg2','scaleEP'};
         err_out = sum(err_out_curr);
     end
 
 
     function [err_eye, err_pc, err_reg] = getError(I, pX_curr, p1_curr, KF_X, KF_1, type)
         
-    
-%         plotBaselineResults(KF_1, I, conds, tts, head, target, E, P, light, sines, [1 2 3 4 23 24 25]);
- 
         % Get the current frequency response
-        [Ehat_freq, Phat_freq, E_gain, E_phase, P_gain, P_phase] = getFreq(KF_X, I, RL_data.freqs);
-        [Ehat_freq1, Phat_freq1, E_gain1, E_phase1, P_gain1, P_phase1] = getFreq(KF_1, I, RL_data.freqs);
+        [Ehat_freq, Phat_freq, E_gain, E_phase, P_gain, P_phase] = getFreq(KF_X, I, RR_data.freqs);
+        [Ehat_freq1, Phat_freq1, E_gain1, E_phase1, P_gain1, P_phase1] = getFreq(KF_1, I, RR_data.freqs);
         E_phase1 = wrapTo180(E_phase1-180);
         E_phase = wrapTo180(E_phase-180);
         
@@ -255,17 +231,16 @@ K2new = updateKp(K1_0, I, p2, mask_tune);
             err_pc_step_trans  = 0;
         end
         weight_freqs = 100000;
-        weight_step = 10000; % changes from 1000
+        weight_step = 10000; 
         weight_transient = 10000; % Don't weight this too much - max measurement of Lisberger 1994 II. may exagerate transient in the data
         
-        % TODO: check scale
         err_eye = [err_eye_JR;...
-            weight_freqs.*err_eye_freq;... % D
+            weight_freqs.*err_eye_freq;... 
             weight_step*err_eye_step];              % Step steady state
         err_pc = [err_pc_JR; ...
             weight_freqs.*err_pc_freq; ...
             weight_step*err_pc_step;...
-            weight_transient*err_pc_step_trans]; % TODO check this!
+            weight_transient*err_pc_step_trans]; 
         
         
         % REGULARIZATION ERROR

@@ -30,7 +30,8 @@ target_vel(isnan(target_vel)) = 0;
 
 freqs_JR = I.freqs_JR; % should be [.5 2 5 10]; 
 
-if mean(head_vel==0) > .95 && mean(target_vel==0)>.95
+% Dumb check if the input is an impulse 
+if nnz(head_vel~=0)==1 || nnz(target_vel~=0)==1
     impulse_test = 1;
 else
     impulse_test = 0;
@@ -63,20 +64,14 @@ if sine
     T_index = ismember(freqs_JR, sine);
     
     % Interpolate if needed
-    if I.include_T_vel
-        if any(T_index)
+    if I.include_T_sine
+%         if any(T_index)
             target_gain_vel = K.PT_vel(T_index,:);
-        else
-            target_gain_vel = interp1(freqs_JR, K.PT_vel, sine); % TODO switch to log frequency
-        end
-    end
-    
-    if  I.include_T_acc
-        if any(T_index)
             target_gain_acc = K.PT_acc(T_index,:);
-        else
-            target_gain_acc = interp1(freqs_JR, K.PT_acc, sine);
-        end
+%         else
+%             target_gain_vel = interp1(freqs_JR, K.PT_vel, sine); % TODO switch to log frequency
+%             target_gain_acc = interp1(freqs_JR, K.PT_acc, sine);
+%         end
     end
     
 end
@@ -116,10 +111,7 @@ for ii = 1:nt-1
         % Retinal slip velocity
         if length(light) == 1
             PR_vel(ii,:) = retslip_vel(ii:-1:ii-i_temp_vis+1)' *...
-                K.PR_vel(1:i_temp_vis,:);
-            
-            
-            
+                K.PR_vel(1:i_temp_vis,:);                                    
         else
             % Visual occlusion test
             % Only let RS input continue until the RS delay
@@ -135,39 +127,36 @@ for ii = 1:nt-1
         PT_vel(ii,:) = 0; % Default
 
         % Predictive target velocity: sines
-        if I.include_T_vel && sine && ii>=(I.delayR/K.dt)            
+        if I.include_T_sine && sine && ii>=(I.delayR/K.dt)            
             if ~impulse_test
                 PT_vel(ii,:) = target_vel(ii) * target_gain_vel;
             end            
         end
         
         % Predictive target velocity: steps
-        if I.include_T_vel_step && ~sine 
+        if I.include_T_step && ~sine 
             i_temp_T = min(ii, size(K.PT_vel_step,1));            
             PT_vel(ii,:) = target_vel(ii:-1:ii-i_temp_T+1)' * ...
-                K.PT_vel_step(1:i_temp_T,:);
-            
+                K.PT_vel_step(1:i_temp_T,:);            
         end
         
         % ---- Predictive target acceleration ----
         PT_acc(ii,:) = 0;  % Default
         
         % Predictive target accelleration: sines
-        if I.include_T_acc && sine && ii>=(I.delayR/K.dt)
+        if I.include_T_sine && sine && ii>=(I.delayR/K.dt)
             if  ~impulse_test
                 PT_acc(ii,:) = target_acc(ii) * target_gain_acc;
             end
         end
         
         % Predictive target accelleration: steps
-        if I.include_T_acc_step && ~sine 
+        if I.include_T_step && ~sine 
             i_temp_T = min(ii, size(K.PT_acc_step,1));
             PT_acc(ii,:) = target_acc(ii:-1:ii-i_temp_T+1)' * ...
-                K.PT_acc_step(1:i_temp_T,:);
-            
+                K.PT_acc_step(1:i_temp_T,:);            
         end
-        
-        
+                
         % Net visual input to PC
         PR(ii,:) = PR_vel(ii,:);
         PT(ii,:) = PT_vel(ii,:) + PT_acc(ii,:);
@@ -196,15 +185,12 @@ for ii = 1:nt-1
     % Head inputs to eye:
      EH =  head_vel(ii:-1:ii-i_temp_EH+1)' * K.EH(1:i_temp_EH);
     
-    % Net PC + visual input to brainstem
-%     EP = (K.p * Phat(ii:-1:ii-i_temp_EP+1, :) + ...
-%         (1-K.p) * ( PR(ii:-1:ii-i_temp_EP+1, :)+PT(ii:-1:ii-i_temp_EP+1, :) ) )' ...
-%         * K.EP(1:i_temp_EP,:);
+    % Net PC input to brainstem
     EP = Phat(ii:-1:ii-i_temp_EP+1, :)'* K.EP(1:i_temp_EP,:);
     
     % Add vestibular noise if needed
     if noise_on
-        PH = PH*(1 + N.noise_PH(ii)) + N.noise_constP(ii); % TODO: change this to just a single constant noise, added at end?
+        PH = PH*(1 + N.noise_PH(ii)) + N.noise_constP(ii);
         EH = EH*(1 + N.noise_EH(ii)) + N.noise_constE(ii);
     end
     

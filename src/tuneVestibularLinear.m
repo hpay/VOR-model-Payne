@@ -90,7 +90,7 @@ B_ineq = -I.fixPH*sum(K1.Kb_pc(B.bPH_maskP))*ones(size(A_ineq,1),1);   % New net
 
 % Fit PC activity vestibular weights
 [Kb_pc_learn,resnorm,residual,exitflag,output,lambda] = lsqlin(...
-    X_pc, Y_pc, A_ineq, B_ineq, Aeq_eye, beq_eye, lb, ub, [], optimset('Algorithm',I.algorithm));
+    X_pc, Y_pc, A_ineq, B_ineq, Aeq_eye, beq_eye, lb, ub, [], optimset('Algorithm','interior-point'));
 
 % DEBUG: Linear prediction
 if debug_on

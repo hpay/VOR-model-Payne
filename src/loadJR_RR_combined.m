@@ -3,7 +3,7 @@ function [conds, nConds_JR, tts, head, target, hevel, ...
     PC, sines, light, dt, n_cells, RR_data] = ...
     loadJR_RR_combined(I, data_path)
 
-% % ------------ JR DATA FOR MODEL FIT -----------------
+% % ------------ J. RAYMOND & LISBERGER DATA  -----------------
 conds = {'05Hz_dark'; '05Hz_pursuit';'05Hz_x2';'05Hz_x0';...
     '2Hz_dark'; '2Hz_x2';'2Hz_x0';...
     '5Hz_dark'; '5Hz_x2';'5Hz_x0';...
@@ -18,17 +18,11 @@ nConds_JR = length(conds);
 [tts, head, target, hevel, heposerr, PC, sines, light, dt, n_cells, cond_inds] = ...
     loadJR(data_path, conds, I.t_step_jr);
 
-% ----------- RAMACHANDRAN & LISBERGER DATA --------
-switch I.RR_data_mean_or_W
-    case 'mean'
-        RR_data = load(fullfile(data_path, 'RamachandranLis2005_DATA_mean'));
- 
-    case 'meanfix' % Remove the outlier data point (12.5 Hz) to avoid overfitting
-        RR_data = load(fullfile(data_path, 'RamachandranLis2005_DATA_mean'));
-        mask = RR_data.freqs == 12.5;        
-        temp = fieldnames(RR_data);
-        for ii = 1:length(temp);     RR_data.(temp{ii})(mask,:,:) = [];   end  
-end
+% ----------- R. RAMACHANDRAN & LISBERGER DATA --------
+RR_data = load(fullfile(data_path, 'RamachandranLis2005_DATA_mean'));
+mask = RR_data.freqs == 12.5; % Remove the outlier data point (12.5 Hz) to avoid overfitting
+temp = fieldnames(RR_data);
+for ii = 1:length(temp);     RR_data.(temp{ii})(mask,:,:) = [];   end
 
 
 % Store gain and phase of JR dark PC sine wave data
@@ -58,7 +52,7 @@ sine_amp = round(amp_head(1));
 
 % If the low freq VOR gains across datasets don't match, impossible to fit both
 % So define scale factor between JR and SL data: first freq for both is 0.5 Hz
-RR_data.scaleJR2SL = RR_data.gains1(1)/gain_eye_JR(1);
+RR_data.scaleJR2RR = RR_data.gains1(1)/gain_eye_JR(1);
 
 % Convert SL gain and phase data to time domain 
 freqs = RR_data.freqs;
@@ -70,7 +64,7 @@ for jj = 1:length(freqs)
     tts{ind} = tt;
     head{ind} = sine_amp*sin(2*pi*freqs(jj)*tt);
     target{ind} = NaN(size(tt));
-    hevel{ind} = -1/RR_data.scaleJR2SL * RR_data.gains1(jj) * sine_amp*sin(2*pi*freqs(jj)*tt + RR_data.phases1(jj)*pi/180);
+    hevel{ind} = -1/RR_data.scaleJR2RR * RR_data.gains1(jj) * sine_amp*sin(2*pi*freqs(jj)*tt + RR_data.phases1(jj)*pi/180);
     
     heposerr{ind} = NaN(size(hevel{ind}));
     
@@ -86,7 +80,7 @@ for jj = 1:length(freqs)
     PC{ind} = NaN(size(tt));
     
     % Check if this frequency is within JR range 0.5 to 10 Hz
-    if freqs(jj) <= max(freqs_JR_dark)  && I.data_add_interp_PC
+    if freqs(jj) <= max(freqs_JR_dark)  
         % If so, estimate using linear interpolation the gain
         % and phase of PC response
         RR_data.gain_PC_SLinterp(jj) = interp1(freqs_JR_dark, gain_PC_JR, freqs(jj));

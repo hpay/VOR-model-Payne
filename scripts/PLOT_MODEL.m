@@ -19,11 +19,12 @@ set(groot,'defaultAxesYTickLabelRotationMode','manual')
 set(groot,'defaultAxesZTickLabelRotationMode','manual')
 
 % Specific model result to analyze
-[folder_root, filename] = fileparts(filepathname);
+[~, filename] = fileparts(filepathname);
 
 % Add helper function folders to search path
 code_folder = fileparts(fileparts(which(mfilename)));
 addpath(genpath(fullfile(code_folder, 'src')))
+folder_root = fullfile(code_folder,'results');
 
 % Load the full model
 D = load(fullfile(folder_root,filename,[filename,'.mat']));
@@ -32,7 +33,6 @@ B = D.B; % Model basis set
 E = D.E; % Model fit errors
 S = D.S; % Scale factors for normalizing data going into model fit
 R = D.R; % Regularization
-
 
 % Change colors
 I.c = flipud(turbo(12));
@@ -44,14 +44,15 @@ if option_final
     dropbox_root = I.figures_path(1:strfind(I.figures_path, 'Dropbox')+6);
     I.figures_path = fullfile(dropbox_root,'rlab','model','Figures');
 end
+I.impulse_or_closedloop = 0; 
 
-% I.data_path = fullfile(folder_root, 'VOR-model','data');
-% [data_path_temp1, data_path_temp2] = fileparts(I.data_path);
-% I.data_path = fullfile(fileparts(which(mfilename)), 'data');
-I.data_path = fullfile(code_folder, 'data');
+% data_path = fullfile(folder_root, 'VOR-model','data');
+% [data_path_temp1, data_path_temp2] = fileparts(data_path);
+% data_path = fullfile(fileparts(which(mfilename)), 'data');
+data_path = fullfile(code_folder, 'data');
 
 [conds, nConds_JR, tts, head, target, hevel, PC, sines, light, ...
-    dt, n_cells, RR_data] = loadJR_RR_combined(I, I.data_path);
+    dt, n_cells, RR_data] = loadJR_RR_combined(I, data_path);
 [conds, tts, head, target, hevel, PC, sines, light] = addStep(I, conds, ...
     tts, head, target, hevel, PC, sines, light);
 
@@ -246,7 +247,7 @@ end
 
 %% Replot final baseline fits 
 mask = 1:25; % Choose conditions to plot
-hf_basefit =  plotBaselineResultsPair(K1([1 11]), I, conds(mask));
+hf_basefit =  plotBaselineResultsPair(K1([1 11]), I, conds(mask), tts(mask), head(mask), target(mask), hevel(mask), PC(mask), light(mask), sines(mask));
 set(hf_basefit,'Position',[1   1   650   775])
 if option_final
     fixticks
@@ -341,9 +342,9 @@ for ii = find(ismember(PFs(:)',[0 1])) % Only plot for pos fdbk = 0 or 1
     [~, ~, E_gain0, E_phase0, P_gain0, P_phase0] = getFreq(K0(ii), I, RR_data.freqs);
     
     % Plot eye frequency response after learning
-    plotFreq(RR_data.freqs, E_gain1*RR_data.scaleJR2SL, E_phase1, linespec, I.learn_color(2,:), I.learn_color(2,:));
-    plotFreq(RR_data.freqs, E_gain2*RR_data.scaleJR2SL, E_phase2, linespec, I.learn_color(3,:), I.learn_color(3,:));
-%     plotFreq(RR_data.freqs, E_gain0*RR_data.scaleJR2SL, E_phase0, linespec, I.learn_color(1,:), I.learn_color(1,:));
+    plotFreq(RR_data.freqs, E_gain1*RR_data.scaleJR2RR, E_phase1, linespec, I.learn_color(2,:), I.learn_color(2,:));
+    plotFreq(RR_data.freqs, E_gain2*RR_data.scaleJR2RR, E_phase2, linespec, I.learn_color(3,:), I.learn_color(3,:));
+%     plotFreq(RR_data.freqs, E_gain0*RR_data.scaleJR2RR, E_phase0, linespec, I.learn_color(1,:), I.learn_color(1,:));
     xlabel('Frequency (Hz)');  fixticks(ptick); drawnow;
     ha = findobj(hF_freq,'Type','Axes');
     pbaspect(ha(1),[1.5 1 1])
