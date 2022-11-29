@@ -1,10 +1,78 @@
-function Knew = tuneVestibularLinear(K1, B, I, S, mask_learn,type, conds,tts, ...
-    R, RR_data, S_pc, S_eye, R_pc, R_eye)
-% Initial linear fit for learned changes in vestibular weights. 
-% TODO try fitting eye with only the artificial step + 0.5 Hz sine
+function [K1, K0, K2] = tuneVestibularLinear(B, I, S, conds, tts,sines,...
+    R, RR_data, S_pc, S_eye, R_pc, R_eye, PF)
+% [K1, K0, K2] = tuneVestibularLinear(B, I, S, R, mask_learn, conds, tts,...
+%     R, RR_data, S_pc, S_eye, R_pc, R_eye)
+% Initial linear fit for vestibular weights. 
+%% ======================= PRE-LEARNING ===============================
+% Only look at low frequencies (which have both eye and PC data) for now (fine tune later)
+sine_mask = repelem(sines, cellfun(@length,tts));
+mask_lo = sine_mask<=10; 
 
-debug_on = 0;
+% Add regularization penalty
+n_eye = length(R.reg_weights_eye);
+X_eye = [S_eye(mask_lo,:); I.reg_lambda0*R.T0_eye; I.reg_lambda1*R.T1_eye; I.reg_lambda2*R.T2_eye]; % Penalize curvature
+Y_eye = [R_eye(mask_lo); zeros(3*n_eye,1)];
 
+% Constrain head velocity filters
+beq_eye = zeros(n_eye, 1);
+Aeq_eye = zeros(n_eye,1);
+
+% Upper and lower bounds
+lb_eye = -inf(n_eye, 1);
+ub_eye = inf(n_eye, 1);
+
+if I.restrict_EP_pos
+    lb_eye(B.bEP_maskE) = 0;
+end
+
+% Solve for eye coefficients
+Kb_eye = lsqlin(X_eye, Y_eye,[],[], diag(Aeq_eye), beq_eye, lb_eye, ub_eye, [], optimset('display','off','Algorithm','interior-point'));
+
+% g1 is the net strength of K_EP. Use to scale K_PE so that K_EP*K_PE = I.PFs(ii).
+K_EP = B.B_EP*Kb_eye(B.bEP_maskE)*S.scale_P;
+g1 = sum(K_EP); % g1*g2 = I.PFs(ii) --> g2 = I.PFs(ii)/g1
+
+%  ******* Purkinje cell fit *******
+n_pc = length(R.reg_weights_pc);
+X_reg = [I.reg_lambda0*R.T0_pc; I.reg_lambda1*R.T1_pc;  I.reg_lambda2*R.T2_pc]; % EDIT 6/25 remove I.scale_PH
+Y_reg = zeros(3*n_pc,1);
+
+X_pc = [S_pc(mask_lo,:); X_reg];
+Y_pc = [R_pc(mask_lo); Y_reg];
+
+% Fix the positive feedback weight to I.PFs(ii)
+Aeq_pc = double(B.bPE_maskP);
+beq_pc = zeros(n_pc, 1);
+beq_pc(B.bPE_maskP) = PF/g1; % g1 is the sum of weights kEP
+
+% Lower and upper bounds
+lb_pc = -inf(n_pc,1);
+ub_pc = inf(n_pc,1);
+
+if I.restrict_PT_pos  % constrain predictive target weights positive
+    lb_pc(B.bPT_vel_maskP | B.bPT_acc_maskP | B.bPT_vel_step_maskP | B.bPT_acc_step_maskP ) = 0;
+end
+
+% For PF = 1 only, don't allow predictive target velocity for steps (causes instability)
+if PF == 1 && I.include_T_step
+    lb_pc(B.bPT_vel_step_maskP) = 0;
+    ub_pc(B.bPT_vel_step_maskP) = 0;
+end
+
+% Solve for PC coefficients
+Kb_pc = lsqlin(X_pc, Y_pc,[],[], diag(Aeq_pc), beq_pc, lb_pc, ub_pc, [], optimset('display','off','Algorithm', 'interior-point'));
+
+
+% Multiply coefficients by bases to get filters in time domain
+K1 = updateK(B, I, S, Kb_eye, Kb_pc);
+
+% Plot linear fit predictions of eye and PC
+[err_eye, err_pc, Ehat_linear, Phat_linear] = plotLinearPredictions(S_eye(mask_lo,:), S_pc(mask_lo,:),R_eye(mask_lo), R_pc(mask_lo),  Kb_eye, Kb_pc);
+
+
+
+
+%% =======================  POST-LEARNING ===============================
 % Mask for artificial steps (used to fit steady state conditions)
 step_mask_all =  repelem(strcmp(conds,'step'), cellfun(@length,tts));
 
@@ -14,10 +82,11 @@ Hz05_dark_mask = repelem(strcmp(conds,'05Hz_dark'), cellfun(@length, tts));
 % Mask/index for Ramachandran and Lisberger frequency conditions
 ind_sines_RR = repelem([zeros(I.nConds_JR,1); (1:length(RR_data.freqs))'; iif(I.include_step,0)], cellfun(@length,tts));
 
-% =======================   LEARNING===============================
+
+% Mask for learning params
+mask_learn = B.learn_mask_vest_eye_pc;
 eye_learn_mask = mask_learn(1:length(B.bEH_maskE));
 pc_learn_mask = mask_learn(length(B.bEH_maskE)+1:end);
-
 
 % Get original gain and phase
 [~, ~, E_gain_orig, E_phase_orig, P_gain_orig, P_phase_orig] = getFreq(K1, I, RR_data.freqs);
@@ -26,6 +95,8 @@ pc_learn_mask = mask_learn(length(B.bEH_maskE)+1:end);
 pc_ss = I.pc_gain_ss + I.pc_ss.*(1-I.eye_ss);
 % basline sp/s + change in sp/s per change in deg/s * change in gain (norm
 % by ratio of JR and SL baseline gains. Order: [Low Normal High]. 
+
+for type = [0 2]
 
 % Assign parameters specific to x0 or x2
 PC_gain_new = pc_ss(type+1); % type: 0:'x0',1:'x1',2:'x2'
@@ -90,13 +161,9 @@ B_ineq = -I.fixPH*sum(K1.Kb_pc(B.bPH_maskP))*ones(size(A_ineq,1),1);   % New net
 
 % Fit PC activity vestibular weights
 [Kb_pc_learn,resnorm,residual,exitflag,output,lambda] = lsqlin(...
-    X_pc, Y_pc, A_ineq, B_ineq, Aeq_eye, beq_eye, lb, ub, [], optimset('Algorithm','interior-point'));
+    X_pc, Y_pc, A_ineq, B_ineq, Aeq_eye, beq_eye, lb, ub, [], optimset('Algorithm','interior-point','Display','off'));
 
-% DEBUG: Linear prediction
-if debug_on
-Y_hat = X_pc*Kb_pc_learn;
-figure; plot(Y_pc,'k'); hold on; plot(Y_hat','r--'); legend('Goal','Actual'); title('PC')
-end
+
 
 %% 2 LEARNING: EYE 
 % Select conditions for eye: all frequencies from 0.5 to 50 Hz
@@ -170,17 +237,16 @@ if I.fixB       % No plasticity in brainstem
 end
 
 % Solve for eye coefficients
-Kb_eye_learn = lsqlin(X_eye, Y_eye,[],[], Aeq_eye, beq_eye, lb_eye, ub_eye);
-
-% DEBUG: Linear prediction
-if debug_on
-    Y_hat = X_eye*Kb_eye_learn;
-    figure; plot(Y_eye,'k'); hold on; plot(Y_hat','r--'); legend('Goal','Actual'); title('Eye')    
-end
+Kb_eye_learn = lsqlin(X_eye, Y_eye,[],[], Aeq_eye, beq_eye, lb_eye, ub_eye,[],optimset('Algorithm','interior-point','Display','off'));
 
 % Store the filters in time domain for this PF strength
 Knew = updateK(B, I, S, Kb_eye_learn, Kb_pc_learn);
+if type==0
+    K0 = Knew;
+elseif type==2
+    K2 = Knew;
+end
 
-
+end
 
 

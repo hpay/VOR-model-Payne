@@ -15,7 +15,7 @@ function RUN_MODEL(savename)
 %
 %   Dataset 2: Ramachandran & Lisberger 2005 EYE VELOCITY data in response to
 %   vestibular inputs in the dark, from 0.5 to 50 Hz, in Normal monkeys and
-%   after High and Low gain training. Specified in the model as RL_data.
+%   after High and Low gain training. Specified in the model as RR_data.
 %
 %   Dataset 3/4: Steady state/low frequency PURKINJE CELL responses to VOR
 %   before v. after learning (Watanabe 1985, Lisberger 1994b). Specified in
@@ -43,7 +43,7 @@ function RUN_MODEL(savename)
 % data before fitting
 % B: basis set
 % R: regularization matrices
-% RL_data: structure containing data quantified from Ramachandran and
+% RR_data: structure containing data quantified from Ramachandran and
 % Lisberger 2005, their Figure 4
 % K1: baseline fit before learning
 % K2: fit after VOR-increase learning
@@ -167,82 +167,14 @@ I.eye_gain_ss = (nanmean(hevel{vord_step_ind}(ss_mask))/nanmean(head{vord_step_i
 I.nConds = length(conds);
 
 % Create stimulus history matrices in basis space
-[S, B, PH_basis, EH_basis, R_basis, T_vel_basis, T_acc_basis,...
-    T_vel_step_basis, T_acc_step_basis, PE_basis, EP_basis] = ...
-    buildLinearFitMatrices(I, head, target, hevel, PC, sines, light);
-
-disp('Bases multiplied')
-
-%% 1. Define stimulus (S) and response (R) for initial linear regression
-
-% Create stimulus matrix for EYE
-S_eye = [cell2mat(EH_basis)*S.scale_H_vel, cell2mat(EP_basis)*S.scale_P];
-S_eye(isnan(S_eye)) = 0;
-
-% Define masks for the kernel for each input signal (in basis space)
-[B.bEH_maskE, B.bEP_maskE] = deal(false(1,size(S_eye,2)));
-order_eye = cumsum([1  I.n_basis]);
-B.bEH_maskE(order_eye(1):order_eye(2)-1) = true;
-B.bEP_maskE(order_eye(2):end) = true;
-
-% Create stimulus matrix for PC
-S_pc = [cell2mat(PH_basis)*S.scale_H_vel, ...                       % Head vel
-    cell2mat(R_basis)*S.scale_R_vel ,...                            % Retslip vel
-    iif(I.include_T_sine, cell2mat(T_vel_basis)*S.scale_T_vel),...   % Predictable target
-    iif(I.include_T_sine, cell2mat(T_acc_basis)*S.scale_T_acc),...
-    iif(I.include_T_step, cell2mat(T_vel_step_basis)*S.scale_T_vel),...
-    iif(I.include_T_step, cell2mat(T_acc_step_basis)*S.scale_T_acc),...
-    cell2mat(PE_basis)...                                           % Efference copy feedback
-    ];
-S_pc(isnan(S_pc)) = 0;
-
-% Define masks locating the coefficients for each input signal
-[B.bPH_maskP, B.bPR_vel_maskP,  B.bPT_vel_maskP,...
-    B.bPT_acc_maskP, B.bPE_maskP, B.bPT_vel_step_maskP, B.bPT_acc_step_maskP]  ...
-    = deal(false(1,size(S_pc,2)));
-order_pc = cumsum([1 I.n_basis,  I.n_basis_vis,...
-    I.include_T_sine*size(B.B_tar,2), I.include_T_sine*size(B.B_tar,2),...
-    I.include_T_step*[1 1] ]);
-B.bPH_maskP(order_pc(1):order_pc(2)-1) = true;
-B.bPR_vel_maskP(order_pc(2):order_pc(3)-1) = true;
-B.bPT_vel_maskP(order_pc(3):order_pc(4)-1) = true;
-B.bPT_acc_maskP(order_pc(4):order_pc(5)-1) = true;
-B.bPT_vel_step_maskP(order_pc(5):order_pc(6)-1) = true;
-B.bPT_acc_step_maskP(order_pc(6):order_pc(7)-1) = true;
-B.bPE_maskP(end) = true;
+[S, B, S_eye, S_pc] = buildLinearFitMatrices(I, head, target, hevel, PC, sines, light);
 
 % Define desired response (R) for linear regression
 R_pc = cell2mat(PC);        % Desired pc
 R_eye = cell2mat(hevel);    % Desired eye
 
-% Only look at low frequencies (which has both eye and PC data) for now (fine tune later)
-sine_mask = repelem(sines, cellfun(@length,head));
-lo_freq_mask = sine_mask<=10; % TODO is this necessary?
-S_pc_lo = S_pc(lo_freq_mask,:);
-S_eye_lo = S_eye(lo_freq_mask,:);
-R_pc_lo = R_pc(lo_freq_mask);
-R_eye_lo = R_eye(lo_freq_mask);
-
-% Store masks for each filter in a structure
-% Mask into "Kb_eye_pc" for all params
-B.bEP_mask     = [B.bEP_maskE        false(size(B.bPH_maskP))];
-B.bEH_mask     = [B.bEH_maskE        false(size(B.bPH_maskP))];
-B.bPH_mask     = [false(size(B.bEH_maskE)) B.bPH_maskP];
-B.bPR_vel_mask = [false(size(B.bEH_maskE)) B.bPR_vel_maskP];
-B.bPT_vel_mask = [false(size(B.bEH_maskE)) B.bPT_vel_maskP];
-B.bPT_vel_step_mask = [false(size(B.bEH_maskE)) B.bPT_vel_step_maskP];
-B.bPT_acc_step_mask = [false(size(B.bEH_maskE)) B.bPT_acc_step_maskP];
-B.bPT_acc_mask = [false(size(B.bEH_maskE)) B.bPT_acc_maskP];
-B.bPE_mask = [false(size(B.bEH_maskE)) B.bPE_maskP];
-
-% Select all weights for FINE TUNING BASELINE in the dark
-B.tune_mask_vest_eye_pc = B.bEH_mask |  B.bPH_mask | B.bEP_mask;
-
-% Select all vestibular weights for LEARNING
-B.learn_mask_vest_eye_pc = B.bEH_mask |  B.bPH_mask;
-if I.fixB % Optional: remove brainstem weights
-    B.learn_mask_vest_eye_pc(B.bEH_mask) = 0;
-end
+% Get regularization structure
+R = getRegularization(B, I);
 
 %% Initialization before running loop
 tic
@@ -251,8 +183,7 @@ tic
 for ii_temp = 1:length(I.runPFs)
     
     rng(0)
-
-    ii = find(abs(I.PFs-I.runPFs(ii_temp))<eps);
+    ii = find( round(I.PFs*10) == round(I.runPFs(ii_temp)*10) );
     close all;
     fprintf('Starting PF = %g\n', I.PFs(ii));        
             
@@ -262,146 +193,44 @@ for ii_temp = 1:length(I.runPFs)
     if exist(curr_savepathname,'file')
         continue;
     end
-    %% 1. LINEAR REGRESSION TO INITIALIZE WEIGHTS
     
-    % ************ Eye fit: first to get scaling for kPE (kEP*kPE = PF)**********
-    R = struct;
-    R.reg_weights_eye = [I.scale_EH*(1:nnz(B.bEH_maskE)).^I.reg_exp ...
-        I.scale_EP*(1:nnz(B.bEP_maskE)).^I.reg_exp_EP];
-    
-    % Get mask where coeffients switch from one filter to another
-    mask_edge_eye = false(size(S_eye_lo,2),1);
-    mask_edge_eye([find(B.bEH_maskE,1) find(B.bEP_maskE,1) ]) = true;
-    
-    % Get Tikhonov regularization matrices
-    R.T0_eye = makeTikhonov(R.reg_weights_eye, 0);
-    R.T1_eye = makeTikhonov(R.reg_weights_eye, 1, mask_edge_eye);
-    R.T2_eye = makeTikhonov(R.reg_weights_eye, 2, mask_edge_eye);
-    
-    % Add regularization penalty
-    X_eye = [S_eye_lo; I.reg_lambda0*R.T0_eye; I.reg_lambda1*R.T1_eye; I.reg_lambda2*R.T2_eye]; % Penalize curvature
-    Y_eye = [R_eye_lo; zeros(3*size(S_eye_lo,2),1)];
-    
-    % Constrain head velocity filters
-    beq_eye = zeros(size(S_eye_lo,2), 1);
-    Aeq_eye = zeros(size(S_eye_lo, 2),1);
-    
-    % Upper and lower bounds
-    lb_eye = -inf(size(S_eye_lo,2), 1);
-    ub_eye = inf(size(S_eye_lo,2), 1);
-    
-    if I.restrict_EP_pos
-        lb_eye(B.bEP_maskE) = 0;
-    end
-    
-    % Solve for eye coefficients
-    Kb_eye = lsqlin(X_eye, Y_eye,[],[], diag(Aeq_eye), beq_eye, lb_eye, ub_eye, [], optimset('display','off','Algorithm','interior-point'));
-    
-    % g1 is the net strength of K_EP. Use to scale K_PE so that K_EP*K_PE = I.PFs(ii).
-    K_EP = B.B_EP*Kb_eye(B.bEP_maskE)*S.scale_P;
-    g1 = sum(K_EP); % g1*g2 = I.PFs(ii) --> g2 = I.PFs(ii)/g1
-    
-    %  ******* Purkinje cell fit *******
-    % Sum of weights, weight increasing with time
-    R.reg_weights_pc = [I.scale_PH*(1:nnz(B.bPH_maskP)).^I.reg_exp ... 
-        I.scale_PR*(1:nnz(B.bPR_vel_maskP)).^I.reg_exp...
-        I.scale_PT*[ones(1, nnz(B.bPT_vel_maskP))...
-        ones(1, nnz(B.bPT_acc_maskP))]...
-        iif(I.include_T_step, I.scale_PT*[1 1])... 
-        0 ];
-    
-    % Get mask where coefficients switch from one filter to another
-    mask_pc_edge = false(size(S_pc_lo,2),1); % Don't penalize curvature between edges of different filters
-    mask_pc_edge([find(B.bPH_maskP,1)  find(B.bPR_vel_maskP,1)...
-        find(B.bPT_vel_maskP)  find(B.bPT_acc_maskP) ...
-        find(B.bPT_vel_step_maskP) find(B.bPT_acc_step_maskP) find(B.bPE_maskP)   ]) = true;
-    
-    % Get Tikhonov regularization matrices
-    R.T0_pc = makeTikhonov(R.reg_weights_pc, 0);
-    R.T1_pc = makeTikhonov(R.reg_weights_pc, 1, mask_pc_edge);
-    R.T2_pc = makeTikhonov(R.reg_weights_pc, 2, mask_pc_edge);
-    
-    X_reg = [I.reg_lambda0*R.T0_pc; I.reg_lambda1*R.T1_pc;  I.reg_lambda2*R.T2_pc]; % EDIT 6/25 remove I.scale_PH
-    Y_reg = zeros(3*size(S_pc_lo,2),1);
-    
-    X_pc = [S_pc_lo; X_reg];
-    Y_pc = [R_pc_lo; Y_reg];
-    
-    % Fix the positive feedback weight to I.PFs(ii)
-    Aeq_pc = double(B.bPE_maskP);
-    beq_pc = zeros(size(S_pc_lo,2), 1);
-    beq_pc(B.bPE_maskP) = I.PFs(ii)/g1; % g1 is the sum of weights kEP    
-    
-    % Lower and upper bounds
-    lb_pc = -inf(size(S_pc_lo,2),1);
-    ub_pc = inf(size(S_pc_lo,2),1);
-    
-    if I.restrict_PT_pos  % constrain predictive target weights positive
-        lb_pc(B.bPT_vel_maskP | B.bPT_acc_maskP | B.bPT_vel_step_maskP | B.bPT_acc_step_maskP ) = 0;
-    end
-    
-    % For PF = 1 only, don't allow predictive target velocity for steps (causes instability)
-    if I.PFs(ii) == 1 && I.include_T_step
-        lb_pc(B.bPT_vel_step_maskP) = 0;
-        ub_pc(B.bPT_vel_step_maskP) = 0;
-    end
-    
+    %% 1. LINEAR REGRESSION TO INITIALIZE WEIGHTS         
     if ii_temp == 1
-        
-        % Solve for PC coefficients
-        Kb_pc = lsqlin(X_pc, Y_pc,[],[], diag(Aeq_pc), beq_pc, lb_pc, ub_pc, [], optimset('display','off','Algorithm', 'interior-point'));
-        
-        fprintf('Linear fit complete for PF = %g\n', I.PFs(ii));
-        
-        % Multiply coefficients by bases to get filters in time domain
-        K1_orig = updateK(B, I, S, Kb_eye, Kb_pc);
-        
-        % Plot linear fit predictions of eye and PC
-        [err_eye, err_pc, Ehat_linear, Phat_linear] = plotLinearPredictions(S_eye_lo, S_pc_lo,R_eye_lo, R_pc_lo,  Kb_eye, Kb_pc);
-                   
-        % Plot resulting filter
-        [hf_filter, ~] = plotFilters(K1_orig);
-        
-        % Plot closed loop model, JR data
+                
+        % Initialize filters for this model using a linear fit
         I.impulse_or_closedloop = 0;    % Set 1 to use impulse response: faster, but everything must be linear
+        [K1_orig, K0_orig, K2_orig] = tuneVestibularLinear(B, I, S, conds, tts, sines,...
+            R, RR_data, S_pc, S_eye, R_pc, R_eye, I.PFs(ii));
+        
+        % Plot initialization results
         E = struct;
         [hf_basefit, E.rmse_eye,  E.rmse_pc, E.nrmse_eye, E.nrmse_pc] = ...
             plotBaselineResults(K1_orig, I, conds, tts, head, target, hevel, PC, light, sines);
+        [hf_filter, ~] = plotFilters(K1_orig);
+        plotPostLearning(I, K1_orig, K2_orig, K0_orig, RR_data);
         
+        % Save initialization results?
         if option_save_results && ismember(I.PFs(ii), option_save_PFs)
             my_export_fig(hf_basefit, fullfile(I.figures_path, sprintf('baseFit%g_orig.pdf', I.PFs(ii))));
             my_export_fig(hf_filter, fullfile(I.figures_path, sprintf('baseFilters%g_orig.pdf', I.PFs(ii))));
-        end
-        
-        % SEQUENTIAL LINEAR FIT - intial guess for learned weights
-        K2_orig = tuneVestibularLinear(K1_orig, B, I, S, B.learn_mask_vest_eye_pc, 2, conds, tts,...
-            R, RR_data, S_pc, S_eye, R_pc, R_eye);
-        
-        K0_orig = tuneVestibularLinear(K1_orig, B, I, S, B.learn_mask_vest_eye_pc, 0, conds,tts, ...
-            R, RR_data, S_pc, S_eye, R_pc, R_eye);
-        
-        %  Plot after initialization
-        [hF_freq_eye, hF_filters, hF_step, hF_sine] = ...
-            plotPostLearning(I, K1_orig, K2_orig, K0_orig, RR_data);
-        
-    else
-        prev_savename = sprintf('%s_%gPF.mat', I.savename, I.PFs(ii)-0.1);
+        end            
+        fprintf('Linear fit complete for PF = %g\n', I.PFs(ii));
 
-        P = load(fullfile(I.figures_path, prev_savename));
-        K1_orig = P.K1;
-        K0_orig = P.K0;
-        K2_orig = P.K2;
+    else
+        
+        % Load the previous model to use as initialization
+        prev_savename = sprintf('%s_%gPF.mat', I.savename, I.PFs(ii)-0.1);
+        a = load(fullfile(I.figures_path, prev_savename));
+        K1_orig = a.K1;
+        K0_orig = a.K0;
+        K2_orig = a.K2;
         
         % Update the feedback loop strength
         g1 = sum(K1_orig.EP); % g1*g2 = I.PFs(ii) --> g2 = I.PFs(ii)/g1
         K1_orig.Kb_pc(B.bPE_maskP) = I.PFs(ii)/g1;        
         K0_orig.Kb_pc(B.bPE_maskP) = I.PFs(ii)/g1;           
         K2_orig.Kb_pc(B.bPE_maskP) = I.PFs(ii)/g1;
-        
-        K1_orig = updateK(B, I, S, K1_orig.Kb_eye, K1_orig.Kb_pc);
-        K0_orig = updateK(B, I, S, K0_orig.Kb_eye, K0_orig.Kb_pc);        
-        K2_orig = updateK(B, I, S, K2_orig.Kb_eye, K2_orig.Kb_pc);
-        
+
         % For PF = 1 only, don't allow predictive target velocity for steps (causes instability)
         if I.PFs(ii) == 1 && I.include_T_step
             K1_orig.Kb_pc(B.bPT_vel_step_maskP) = 0;           
@@ -413,27 +242,26 @@ for ii_temp = 1:length(I.runPFs)
         K0_orig = updateK(B, I, S, K0_orig.Kb_eye, K0_orig.Kb_pc);        
         K2_orig = updateK(B, I, S, K2_orig.Kb_eye, K2_orig.Kb_pc);
             
-    end
-        
+    end        
     
-    %% 2. NONLINEAR OPTIMIZATION FOR VESTIBULAR WEIGHTS ON CLOSED LOOP MODEL
+    %% 2. NONLINEAR OPTIMIZATION FOR VESTIBULAR WEIGHTS IN CLOSED LOOP 
     % Fine tune vestibular weights and implement vestibular learning
-%     close all;
+
     % SIMULTANEOUS FINE TUNING AND LEARNING OF VESTIBULAR PARAMETERS ***
     I.impulse_or_closedloop = 1;
     fprintf('Starting vestibular fine tuning, simultaneous for PF = %g\n', I.PFs(ii));
-    [K0, K1_vest, K2] =  tuneVestibularSimultaneousOld(...
+    [K0, K1, K2] =  tuneVestibularSimultaneousOld(...
         K0_orig, K1_orig, K2_orig, B, I, S,...
         tts,  head, target, hevel, PC,  conds, light, sines, R, RR_data);
     fprintf('Finished vestibular fine tuning, simultaneous for PF = %g\n', I.PFs(ii));
        
     % Plot closed loop model
     [hf_basefit, E.rmse_eye,  E.rmse_pc, E.nrmse_eye, E.nrmse_pc]= ...
-        plotBaselineResults(K1_vest, I, conds(~light), tts(~light), head(~light), target(~light), hevel(~light), PC(~light), light(~light), sines(~light));
+        plotBaselineResults(K1, I, conds(~light), tts(~light), head(~light), target(~light), hevel(~light), PC(~light), light(~light), sines(~light));
     
     % Plot for learning
     [hF_freq_eye, hF_filters, hF_step, hF_sine] = ...
-        plotPostLearning(I, K1_vest, K2, K0, RR_data);
+        plotPostLearning(I, K1, K2, K0, RR_data);
     
     % Plot freq data
     hF_freq_data = figure;
@@ -451,11 +279,8 @@ for ii_temp = 1:length(I.runPFs)
         my_export_fig(hF_freq_data, fullfile(I.figures_path, sprintf('learn_freq_data.pdf')),'-dpdf');
     end
     
-    % Update K1 with tuned weights
-    K1 = K1_vest;
     
-    
-    %% 3. NONLINEAR OPTIMIZATION FOR VISUAL WEIGHTS ON CLOSED LOOP MODEL
+    %% 3. NONLINEAR OPTIMIZATION FOR VISUAL WEIGHTS IN CLOSED LOOP 
     % Fine tune retinal slip and target parameters        
     I.impulse_or_closedloop = 0; % Equivalent results but faster
     
@@ -487,14 +312,11 @@ for ii_temp = 1:length(I.runPFs)
         learn_mask_vis_eye_pc = [false(size(B.bEH_maskE)) false(size(B.bPH_maskP))];
         learn_mask_vis_eye_pc(length(B.bEH_maskE) + [find(B.bPT_vel_maskP,1) find(B.bPT_acc_maskP,1)]) = true;
         
-        %  Tune predictive target signals
+        % Tune predictive target signals
         [K1_vis, K0_vis, K2_vis] = ...
             tuneTargetCancellation(K1_vis, K0_vis, K2_vis, B, I, S, learn_mask_vis_eye_pc, head, target, conds, light, sines);
         fprintf('Finished predictive target fine tuning for PF = %g\n', I.PFs(ii));
-    end
-    
-    I.impulse_or_closedloop = 1;
-    
+    end       
     
     %% Visual fine tuning plots
     % Plot new model before learning: with tuned retinal slip/target
@@ -521,7 +343,7 @@ for ii_temp = 1:length(I.runPFs)
     K0 = K0_vis;
     K2 = K2_vis;
     
-    save(curr_savepathname, 'I', 'S', 'B', 'R', 'RL_data',...
+    save(curr_savepathname, 'I', 'S', 'B', 'R', 'RR_data',...
         'K1','K2','K0','conds',  'E')
     
     fprintf('Complete PF = \n');

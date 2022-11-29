@@ -1,5 +1,4 @@
-function [S, B, PH_basis, EH_basis, R_basis, T_vel_basis, T_acc_basis,...
-T_vel_step_basis, T_acc_step_basis, PE_basis, EP_basis] = ...
+function [S, B, S_eye, S_pc] = ...
 buildLinearFitMatrices(I, head, target, hevel, PC, sines, light)
 % [S, PH_basis, EH_basis, R_basis, T_vel_basis, T_acc_basis,...
 % T_vel_step_basis, T_acc_step_basis, PE_basis, EP_basis] = ...
@@ -84,7 +83,7 @@ for jj = 1:I.nConds
 end
 
 
-% Normalize so different inputs have roughly equal amplitude (all are
+%% Normalize so different inputs have roughly equal amplitude (all are
 % already centered around 0). TODO: could eliminate and combine with
 % regularization
 S = [];
@@ -94,3 +93,68 @@ S.scale_R_vel = 1/std(cell2mat(retslip_vel(1:I.nConds_JR)),'omitnan');
 S.scale_T_vel = 1/std(cell2mat(target_vel(1:I.nConds_JR)),'omitnan');
 S.scale_T_acc = 1/std(cell2mat(target_acc(1:I.nConds_JR)),'omitnan');
 S.scale_E = 1/std(cell2mat(hevel(1:I.nConds_JR)),'omitnan');
+
+
+
+%% Define stimulus (S) and response (R) for initial linear regression
+
+% Create stimulus matrix for EYE
+S_eye = [cell2mat(EH_basis)*S.scale_H_vel, cell2mat(EP_basis)*S.scale_P];
+S_eye(isnan(S_eye)) = 0;
+
+% Define masks for the kernel for each input signal (in basis space)
+[B.bEH_maskE, B.bEP_maskE] = deal(false(1,size(S_eye,2)));
+order_eye = cumsum([1  I.n_basis]);
+B.bEH_maskE(order_eye(1):order_eye(2)-1) = true;
+B.bEP_maskE(order_eye(2):end) = true;
+
+% Create stimulus matrix for PC
+S_pc = [cell2mat(PH_basis)*S.scale_H_vel, ...                       % Head vel
+    cell2mat(R_basis)*S.scale_R_vel ,...                            % Retslip vel
+    iif(I.include_T_sine, cell2mat(T_vel_basis)*S.scale_T_vel),...   % Predictable target
+    iif(I.include_T_sine, cell2mat(T_acc_basis)*S.scale_T_acc),...
+    iif(I.include_T_step, cell2mat(T_vel_step_basis)*S.scale_T_vel),...
+    iif(I.include_T_step, cell2mat(T_acc_step_basis)*S.scale_T_acc),...
+    cell2mat(PE_basis)...                                           % Efference copy feedback
+    ];
+S_pc(isnan(S_pc)) = 0;
+
+% Define masks locating the coefficients for each input signal
+[B.bPH_maskP, B.bPR_vel_maskP,  B.bPT_vel_maskP,...
+    B.bPT_acc_maskP, B.bPE_maskP, B.bPT_vel_step_maskP, B.bPT_acc_step_maskP]  ...
+    = deal(false(1,size(S_pc,2)));
+order_pc = cumsum([1 I.n_basis,  I.n_basis_vis,...
+    I.include_T_sine*size(B.B_tar,2), I.include_T_sine*size(B.B_tar,2),...
+    I.include_T_step*[1 1] ]);
+B.bPH_maskP(order_pc(1):order_pc(2)-1) = true;
+B.bPR_vel_maskP(order_pc(2):order_pc(3)-1) = true;
+B.bPT_vel_maskP(order_pc(3):order_pc(4)-1) = true;
+B.bPT_acc_maskP(order_pc(4):order_pc(5)-1) = true;
+B.bPT_vel_step_maskP(order_pc(5):order_pc(6)-1) = true;
+B.bPT_acc_step_maskP(order_pc(6):order_pc(7)-1) = true;
+B.bPE_maskP(end) = true;
+
+
+
+% Store masks for each filter in a structure
+% Mask into "Kb_eye_pc" for all params
+B.bEP_mask     = [B.bEP_maskE        false(size(B.bPH_maskP))];
+B.bEH_mask     = [B.bEH_maskE        false(size(B.bPH_maskP))];
+B.bPH_mask     = [false(size(B.bEH_maskE)) B.bPH_maskP];
+B.bPR_vel_mask = [false(size(B.bEH_maskE)) B.bPR_vel_maskP];
+B.bPT_vel_mask = [false(size(B.bEH_maskE)) B.bPT_vel_maskP];
+B.bPT_vel_step_mask = [false(size(B.bEH_maskE)) B.bPT_vel_step_maskP];
+B.bPT_acc_step_mask = [false(size(B.bEH_maskE)) B.bPT_acc_step_maskP];
+B.bPT_acc_mask = [false(size(B.bEH_maskE)) B.bPT_acc_maskP];
+B.bPE_mask = [false(size(B.bEH_maskE)) B.bPE_maskP];
+
+% Select all weights for FINE TUNING BASELINE in the dark
+B.tune_mask_vest_eye_pc = B.bEH_mask |  B.bPH_mask | B.bEP_mask;
+
+% Select all vestibular weights for LEARNING
+B.learn_mask_vest_eye_pc = B.bEH_mask |  B.bPH_mask;
+if I.fixB % Optional: remove brainstem weights
+    B.learn_mask_vest_eye_pc(B.bEH_mask) = 0;
+end
+
+
