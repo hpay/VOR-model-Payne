@@ -195,7 +195,7 @@ for ii_temp = 1:length(I.runPFs)
     end
     
     %% 1. LINEAR REGRESSION TO INITIALIZE WEIGHTS         
-    if ii_temp == 1
+    if I.PFs(1)==I.runPFs(ii_temp)
                 
         % Initialize filters for this model using a linear fit
         I.impulse_or_closedloop = 0;    % Set 1 to use impulse response: faster, but everything must be linear
@@ -248,9 +248,9 @@ for ii_temp = 1:length(I.runPFs)
     % Fine tune vestibular weights and implement vestibular learning
 
     % SIMULTANEOUS FINE TUNING AND LEARNING OF VESTIBULAR PARAMETERS ***
-    I.impulse_or_closedloop = 1;
+    I.impulse_or_closedloop = 1; % 1 for impulse, faster with same result for vestibular filters
     fprintf('Starting vestibular fine tuning, simultaneous for PF = %g\n', I.PFs(ii));
-    [K0, K1, K2] =  tuneVestibularSimultaneousOld(...
+    [K0, K1, K2] =  tuneVestibularSimultaneous(...
         K0_orig, K1_orig, K2_orig, B, I, S,...
         tts,  head, target, hevel, PC,  conds, light, sines, R, RR_data);
     fprintf('Finished vestibular fine tuning, simultaneous for PF = %g\n', I.PFs(ii));
