@@ -4,6 +4,10 @@
 *.png
 *.tif
 *.pdf
-results
+
 .ipynb_checkpoints
 __pycache__
+
+
+results/*
+!results/published
