@@ -11,9 +11,7 @@ ptick = 0.5; % scaling for ticks, increase to make longer
 if ~exist('option_final','var') 
     option_final = 0;
 end
-if option_final
-    paperDefaults
-end
+
 set(groot,'defaultAxesXTickLabelRotationMode','manual')
 set(groot,'defaultAxesYTickLabelRotationMode','manual')
 set(groot,'defaultAxesZTickLabelRotationMode','manual')
@@ -26,6 +24,10 @@ code_folder = fileparts(fileparts(which(mfilename)));
 addpath(genpath(fullfile(code_folder, 'src')))
 folder_root = fullfile(code_folder,'results');
 data_path = fullfile(code_folder, 'data');
+
+if option_final
+    paperDefaults
+end
 
 % Load the full model
 D = load(fullfile(folder_root,filename,[filename,'.mat']));
@@ -314,13 +316,18 @@ fsize = [10.6627   10.2923    3.3  4.4]; % cm
 
 % Plot freq data
 hF_freq = figure('Units','centi','Pos',fsize); drawnow
-plotFreq(RR_data.freqs, RR_data.gains1, RR_data.phases1+180, linespec, I.learn_color(2,:), I.learn_color(2,:));
-plotFreq(RR_data.freqs, RR_data.gains2, RR_data.phases2+180, linespec, I.learn_color(3,:), I.learn_color(3,:));
+plotFreq(RR_data.freqs, RR_data.gains1, RR_data.phases1+180, '-o', I.learn_color(2,:), I.learn_color(2,:));
+plotFreq(RR_data.freqs, RR_data.gains2, RR_data.phases2+180, '-^', I.learn_color(3,:), I.learn_color(3,:));
 % plotFreq(RR_data.freqs, RR_data.gains0, RR_data.phases0+180, linespec, I.learn_color(1,:), I.learn_color(1,:));
 xlabel('Frequency (Hz)');   fixticks(ptick); drawnow;
 ha = findobj(hF_freq,'Type','Axes'); 
 pbaspect(ha(1),[1.5 1 1])
 pbaspect(ha(2),[1.5 1 1])
+
+ha(1).YRuler.TickLabelGapOffset = 0;
+ha(1).XRuler.TickLabelGapOffset = 0;
+ha(2).YRuler.TickLabelGapOffset = 0;
+ha(2).XRuler.TickLabelGapOffset = 0;
 
 if option_final
     export_fig(hF_freq, fullfile(I.figures_path, 'learn_freq_data.pdf'),'-nocrop');
@@ -338,13 +345,21 @@ for ii = find(ismember(PFs(:)',[0 1])) % Only plot for pos fdbk = 0 or 1
     [~, ~, E_gain0, E_phase0, P_gain0, P_phase0] = getFreq(K0(ii), I, RR_data.freqs);
     
     % Plot eye frequency response after learning
-    plotFreq(RR_data.freqs, E_gain1*RR_data.scaleJR2RR, E_phase1, linespec, I.learn_color(2,:), I.learn_color(2,:));
-    plotFreq(RR_data.freqs, E_gain2*RR_data.scaleJR2RR, E_phase2, linespec, I.learn_color(3,:), I.learn_color(3,:));
-%     plotFreq(RR_data.freqs, E_gain0*RR_data.scaleJR2RR, E_phase0, linespec, I.learn_color(1,:), I.learn_color(1,:));
+    c_base = I.c(ii,:);
+    c_x2 = I.c(ii,:)*.4;
+    
+    plotFreq(RR_data.freqs, E_gain1*RR_data.scaleJR2RR, E_phase1, '-o', c_base, c_base);
+    plotFreq(RR_data.freqs, E_gain2*RR_data.scaleJR2RR, E_phase2, '-^', c_x2, c_x2);
     xlabel('Frequency (Hz)');  fixticks(ptick); drawnow;
     ha = findobj(hF_freq,'Type','Axes');
     pbaspect(ha(1),[1.5 1 1])
     pbaspect(ha(2),[1.5 1 1])
+    
+    ha(1).YRuler.TickLabelGapOffset = 0;  
+    ha(1).XRuler.TickLabelGapOffset = 0;  
+    ha(2).YRuler.TickLabelGapOffset = 0;  
+    ha(2).XRuler.TickLabelGapOffset = 0;  
+
     if option_final
         export_fig(hF_freq, fullfile(I.figures_path, sprintf('learn_freq%g.pdf', I.PFs(ii))),'-nocrop');
     else

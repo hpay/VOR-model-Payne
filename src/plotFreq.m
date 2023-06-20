@@ -45,7 +45,7 @@ else
     else
         axes(sHandle(1)); hold on
     end
-    htemp = line(log10([frequencies(1) frequencies(end)]),log10([1 1]),'Color','k','LineStyle','--'); hold on; uistack(htemp, 'bottom')
+    htemp = line(log10([frequencies(1) frequencies(end)]),log10([1 1]),'Color','k','LineStyle',':'); hold on; uistack(htemp, 'bottom')
     dHandle(1) = plot(log10(frequencies),log10(gains), 'Marker', marker,'Color',color,...
         'MarkerEdgeColor',color,'MarkerFaceColor',fillcolor,'MarkerSize',msize,'LineStyle',linestyle); hold on % DATA
 
@@ -59,7 +59,7 @@ else
     else
         axes(sHandle(2)); hold on
     end
-    htemp = line(log10([frequencies(1) frequencies(end)]),[0 0],'Color','k','LineStyle','--'); hold on; uistack(htemp, 'bottom')
+    htemp = line(log10([frequencies(1) frequencies(end)]),[0 0],'Color','k','LineStyle',':'); hold on; uistack(htemp, 'bottom')
     
     dHandle(2) = plot(log10(frequencies),rad2deg(unwrap(deg2rad(wrapTo180(phases)))), 'Marker', marker,...
         'Color',color,'MarkerEdgeColor',color,'MarkerFaceColor',fillcolor,'MarkerSize',msize,'LineStyle',linestyle); hold on % DATA
