@@ -3,7 +3,7 @@ function plotStep(K_1, K_2, K_0, I, learn_color)
 % 
 % Plots step response before and after learning
 
-T_smooth = 0.025;   % (s) % 0.01
+T_smooth = 0.02;   % (s) % 0.01
 T_step = 0.25;      % (s) Time to go out for step
 amp = 10;           % (deg/s) Scale for step
 
