@@ -4,7 +4,8 @@ linespec,color,fillcolor, sHandle, newplot)
 % plotFreq(RL_data.freqs, RL_data.gains1, RL_data.phases1+180,
 % linespec, I.learn_color(2,:), I.learn_color(2,:));
 
-msize = 1.5;
+lw = 1.2;
+msize = 3;
 phases = unwrap(wrapTo180(phases-180)*pi/180)*180/pi;
 linestyle = '-';
 marker = 'o';
@@ -31,12 +32,12 @@ end
 if exist('sHandle','var') && ~newplot 
     axes(sHandle(1))
     dHandle(1) = line(log10(frequencies),log10(gains),'Marker', marker,...
-        'Color',color,'MarkerEdgeColor',color,'MarkerFaceColor',fillcolor,...
-        'MarkerSize',msize,'LineStyle',linestyle,'Clipping','off'); hold on % DATA
+        'Color',color,'MarkerEdgeColor','none','MarkerFaceColor',fillcolor,...
+        'MarkerSize',msize,'LineStyle',linestyle,'Clipping','off','LineWidth',lw); hold on % DATA
     axes(sHandle(2))
     dHandle(2) = line(log10(frequencies), rad2deg(unwrap(deg2rad(wrapTo180(phases)))),'Marker', marker,...
-        'Color',color,'MarkerEdgeColor',color,'MarkerFaceColor',fillcolor,...
-        'MarkerSize',msize,'LineStyle',linestyle,'Clipping','off'); hold on % DATA
+        'Color',color,'MarkerEdgeColor','none','MarkerFaceColor',fillcolor,...
+        'MarkerSize',msize,'LineStyle',linestyle,'Clipping','off','LineWidth',lw); hold on % DATA
 else        
     ylimsPhase = [-100 30];
     if ~exist('sHandle','var')
@@ -47,7 +48,7 @@ else
     end
     htemp = line(log10([frequencies(1) frequencies(end)]),log10([1 1]),'Color','k','LineStyle',':'); hold on; uistack(htemp, 'bottom')
     dHandle(1) = plot(log10(frequencies),log10(gains), 'Marker', marker,'Color',color,...
-        'MarkerEdgeColor',color,'MarkerFaceColor',fillcolor,'MarkerSize',msize,'LineStyle',linestyle); hold on % DATA
+        'MarkerEdgeColor','none','MarkerFaceColor',fillcolor,'MarkerSize',msize,'LineStyle',linestyle,'LineWidth',lw); hold on % DATA
 
     set(gca,'YTick',log10([.1:.1:1 2 3]),'YTickLabel',{[],[],[],[],'.5',[],[],[],[],'1',[],'3'})
     ylim(log10([.3 3]));
@@ -62,7 +63,7 @@ else
     htemp = line(log10([frequencies(1) frequencies(end)]),[0 0],'Color','k','LineStyle',':'); hold on; uistack(htemp, 'bottom')
     
     dHandle(2) = plot(log10(frequencies),rad2deg(unwrap(deg2rad(wrapTo180(phases)))), 'Marker', marker,...
-        'Color',color,'MarkerEdgeColor',color,'MarkerFaceColor',fillcolor,'MarkerSize',msize,'LineStyle',linestyle); hold on % DATA
+        'Color',color,'MarkerEdgeColor','none','MarkerFaceColor',fillcolor,'MarkerSize',msize,'LineStyle',linestyle,'LineWidth',lw); hold on % DATA
 
     ylim(ylimsPhase);
     yticks = -90:30:ylimsPhase(2);

@@ -203,8 +203,6 @@ else
     my_export_fig(fullfile(I.figures_path,'baseW.pdf'))
 end
 
-
-%% ============Run prediction from stimulation to PC==============
 %% ============Run prediction from stimulation to PC==============
 
 dt = .0005;
@@ -346,7 +344,7 @@ for ii = find(ismember(PFs(:)',[0 1])) % Only plot for pos fdbk = 0 or 1
     
     % Plot eye frequency response after learning
     c_base = I.c(ii,:);
-    c_x2 = I.c(ii,:)*.4;
+    c_x2 = I.c(ii,:)*.6;
     
     plotFreq(RR_data.freqs, E_gain1*RR_data.scaleJR2RR, E_phase1, '-o', c_base, c_base);
     plotFreq(RR_data.freqs, E_gain2*RR_data.scaleJR2RR, E_phase2, '-^', c_x2, c_x2);
@@ -402,7 +400,6 @@ if exist([filepathname,'_noLTP'],'dir')
     
 end
 for ii = find(ismember(PFs(:)',[0 1]))
-    %%
     if ismember(PFs(ii), I.runPFs)
         rng(1)
         % Set sigmas for noise in simulated population of PCS
