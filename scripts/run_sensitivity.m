@@ -168,6 +168,7 @@ x = get(gca,'XLabel');
 set(x,'Units','norm','Pos',[.95 -.05 0])
 y = get(gca,'YLabel');
 set(y,'Units','norm','Pos',[.4 -.1 0])
+% print('sens_kEH_kEP','-dpng','-r300')
 
 %% Plot cost function - Purkinje cell parameters
 fi(2) = figure('Units','centi', 'Pos',fpos);
@@ -192,4 +193,30 @@ x = get(gca,'XLabel');
 set(x,'Units','norm','Pos',[.4 -.1 0])
 y = get(gca,'YLabel');
 set(y,'Units','norm','Pos',[.95 -.05 0])
+% print('sens_kPH_kPE','-dpng','-r300')   
+
+%% Plot cost function - Purkinje cell parameters kPH and kPR
+fi(3) = figure('Units','centi', 'Pos',fpos);
+ax(3) = gca;
+i1 = 3;
+i2 = 5;
+axes(ax(3));
+best_fit_on = 2; % Find the kPR that minimizes cost for each combination of inputs
+[p, C2] = plotCost(fC_matfun, k0, i1, i2, zlims, klabels_plot, complex_on, best_fit_on);
+title('Purkinje cell pathways','FontWeight','normal')
+view(views(1)+180, views(2))
+delete(findobj(gca,'Type','Light'))
+if stim_on
+    camlight(1, -20,'infinite')
+else
+    camlight(1, 15,'infinite')
+end
+camlight
+drawnow;
+set(gca,'ZTick',0:.1:.2)
+x = get(gca,'XLabel');
+set(x,'Units','norm','Pos',[.4 -.1 0])
+y = get(gca,'YLabel');
+set(y,'Units','norm','Pos',[.95 -.05 0])
     
+% print('sens_kPH_kPR','-dpng','-r300')
